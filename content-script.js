@@ -61,6 +61,32 @@
     }
   }
 
+  function resolveFullUrl(resource, baseUrl = window.location.href) {
+    try {
+      // Handle string URLs and Request objects
+      const urlString = typeof resource === 'string' ? resource : resource.url;
+      
+      // Create full URL using current page as base for relative URLs
+      const fullUrl = new URL(urlString, baseUrl);
+      return {
+        fullUrl: fullUrl.href,
+        baseUrl: `${fullUrl.protocol}//${fullUrl.host}`,
+        path: fullUrl.pathname + fullUrl.search + fullUrl.hash,
+        isRelative: !urlString.startsWith('http') && !urlString.startsWith('//')
+      };
+    } catch (e) {
+      console.warn('🔍 MAIN: Failed to parse URL:', resource, e);
+      // Fallback for malformed URLs
+      const urlString = typeof resource === 'string' ? resource : resource.url;
+      return {
+        fullUrl: urlString,
+        baseUrl: window.location.origin,
+        path: urlString,
+        isRelative: false
+      };
+    }
+  }
+
   function logRequestResponse(data) {
     // Send to ISOLATED world for forwarding to background
     console.log('🔍 MAIN: Sending request to ISOLATED world:', data.url);
@@ -74,20 +100,27 @@
   const originalFetch = window.fetch;
   window.fetch = function(resource, init = {}) {
     console.log("Fetch intercepted:", resource, init);
-    const url = typeof resource === 'string' ? resource : resource.url;
     
-    if (!shouldCapture(url)) {
-      console.log('🔍 Request Sniffer: Fetch not captured:', url);
+    // Parse and resolve URL
+    const urlInfo = resolveFullUrl(resource);
+    const fullUrl = urlInfo.fullUrl;
+    
+    if (!shouldCapture(fullUrl)) {
+      console.log('🔍 Request Sniffer: Fetch not captured:', fullUrl);
       return originalFetch.apply(this, arguments);
     }
     
-    console.log('🔍 Request Sniffer: ✅ Capturing fetch:', url);
+    console.log('🔍 Request Sniffer: ✅ Capturing fetch:', fullUrl, urlInfo.isRelative ? '(relative)' : '(absolute)');
 
     const startTime = Date.now();
     const requestData = {
       timestamp: new Date().toISOString(),
       method: init.method || 'GET',
-      url: url,
+      url: fullUrl,
+      baseUrl: urlInfo.baseUrl,
+      path: urlInfo.path,
+      isRelative: urlInfo.isRelative,
+      originalUrl: typeof resource === 'string' ? resource : resource.url,
       type: 'fetch'
     };
 
@@ -141,11 +174,14 @@
       const isJsonResponse = isJsonContent(responseContentType);
       
       // Log ALL matching requests for debugging, not just JSON APIs
-      console.log('🔍 Request Sniffer: Response received for:', url, {
+      console.log('🔍 Request Sniffer: Response received for:', fullUrl, {
         isJsonRequest,
         isJsonResponse,
-        hasApiInUrl: url.includes('api'),
-        willLog: true // Always log for debugging
+        hasApiInUrl: fullUrl.includes('api'),
+        willLog: true, // Always log for debugging
+        baseUrl: requestData.baseUrl,
+        path: requestData.path,
+        isRelative: requestData.isRelative
       });
       
       // Clone response to read body
@@ -178,10 +214,18 @@
 
   XMLHttpRequest.prototype.open = function(method, url, async, user, password) {
     console.log("XHR opened:", method, url);
+    
+    // Parse and resolve URL
+    const urlInfo = resolveFullUrl(url);
+    
     this._requestData = {
       timestamp: new Date().toISOString(),
       method: method,
-      url: url,
+      url: urlInfo.fullUrl,
+      baseUrl: urlInfo.baseUrl,
+      path: urlInfo.path,
+      isRelative: urlInfo.isRelative,
+      originalUrl: url,
       type: 'xhr',
       requestHeaders: {}
     };
@@ -205,7 +249,7 @@
       return originalXHRSend.apply(this, arguments);
     }
     
-    console.log('🔍 Request Sniffer: ✅ Capturing XHR:', this._requestData.url);
+    console.log('🔍 Request Sniffer: ✅ Capturing XHR:', this._requestData.url, this._requestData.isRelative ? '(relative)' : '(absolute)');
 
     // Capture request body
     if (body) {
@@ -258,7 +302,10 @@
           isJsonRequest,
           isJsonResponse,
           hasApiInUrl: this._requestData.url.includes('api'),
-          willLog: true // Always log for debugging
+          willLog: true, // Always log for debugging
+          baseUrl: this._requestData.baseUrl,
+          path: this._requestData.path,
+          isRelative: this._requestData.isRelative
         });
         
         // Capture response body if JSON
