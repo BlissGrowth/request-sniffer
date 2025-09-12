@@ -21,8 +21,14 @@
       <input type="text" id="urlPattern" placeholder=".*api.*" class="url-input">
     </div>
     
+    <div class="setting-group">
+      <label for="reportingUrl" class="setting-label">Reporting URL (Optional)</label>
+      <input type="text" id="reportingUrl" placeholder="https://your-server.com/webhook" class="url-input">
+    </div>
+    
     <div class="info">
       <p>Enter a regex pattern to match URLs. When enabled, matching requests will be logged to the console.</p>
+      <p>If a reporting URL is provided, captured requests will be sent via POST to that endpoint.</p>
     </div>
   </div>
 

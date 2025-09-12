@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
   const toggleEnabled = document.getElementById('toggleEnabled');
   const urlPattern = document.getElementById('urlPattern');
+  const reportingUrl = document.getElementById('reportingUrl');
   const requestsList = document.getElementById('requestsList');
   const clearRequestsBtn = document.getElementById('clearRequests');
   const requestModal = document.getElementById('requestModal');
@@ -9,9 +10,10 @@ document.addEventListener('DOMContentLoaded', function() {
   
   let currentRequests = [];
 
-  chrome.storage.sync.get(['enabled', 'urlPattern'], function(result) {
+  chrome.storage.sync.get(['enabled', 'urlPattern', 'reportingUrl'], function(result) {
     toggleEnabled.checked = result.enabled || false;
     urlPattern.value = result.urlPattern || '.*';
+    reportingUrl.value = result.reportingUrl || '';
   });
 
   toggleEnabled.addEventListener('change', function() {
@@ -22,7 +24,8 @@ document.addEventListener('DOMContentLoaded', function() {
     chrome.runtime.sendMessage({
       action: 'updateSettings',
       enabled: enabled,
-      urlPattern: urlPattern.value
+      urlPattern: urlPattern.value,
+      reportingUrl: reportingUrl.value
     });
   });
 
@@ -34,7 +37,22 @@ document.addEventListener('DOMContentLoaded', function() {
       chrome.runtime.sendMessage({
         action: 'updateSettings',
         enabled: true,
-        urlPattern: pattern
+        urlPattern: pattern,
+        reportingUrl: reportingUrl.value
+      });
+    }
+  });
+
+  reportingUrl.addEventListener('input', function() {
+    const url = reportingUrl.value;
+    chrome.storage.sync.set({ reportingUrl: url });
+    
+    if (toggleEnabled.checked) {
+      chrome.runtime.sendMessage({
+        action: 'updateSettings',
+        enabled: true,
+        urlPattern: urlPattern.value,
+        reportingUrl: url
       });
     }
   });

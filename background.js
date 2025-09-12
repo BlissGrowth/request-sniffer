@@ -1,5 +1,6 @@
 let isEnabled = false;
 let urlPattern = '.*';
+let reportingUrl = '';
 let capturedRequests = [];
 const MAX_REQUESTS = 100;
 
@@ -7,10 +8,37 @@ chrome.runtime.onStartup.addListener(initializeSettings);
 chrome.runtime.onInstalled.addListener(initializeSettings);
 
 function initializeSettings() {
-  chrome.storage.sync.get(['enabled', 'urlPattern'], function(result) {
+  chrome.storage.sync.get(['enabled', 'urlPattern', 'reportingUrl'], function(result) {
     isEnabled = result.enabled || false;
     urlPattern = result.urlPattern || '.*';
+    reportingUrl = result.reportingUrl || '';
   });
+}
+
+// Function to send captured request to reporting URL
+async function reportCapturedRequest(requestData) {
+  if (!reportingUrl || !reportingUrl.trim()) {
+    return; // No reporting URL configured
+  }
+
+  try {
+    console.log('🔍 Background: Sending request to reporting URL:', reportingUrl);
+    const response = await fetch(reportingUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestData)
+    });
+
+    if (response.ok) {
+      console.log('🔍 Background: Successfully reported request to:', reportingUrl);
+    } else {
+      console.warn('🔍 Background: Failed to report request. Status:', response.status, response.statusText);
+    }
+  } catch (error) {
+    console.error('🔍 Background: Error reporting request to', reportingUrl, ':', error.message);
+  }
 }
 
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
@@ -19,13 +47,15 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   if (request.action === 'updateSettings') {
     isEnabled = request.enabled;
     urlPattern = request.urlPattern || '.*';
+    reportingUrl = request.reportingUrl || '';
     chrome.storage.sync.set({
       enabled: isEnabled,
-      urlPattern: urlPattern
+      urlPattern: urlPattern,
+      reportingUrl: reportingUrl
     });
     
     // Forward settings to all content scripts
-    console.log('🔍 Background: Forwarding settings to all tabs:', { isEnabled, urlPattern });
+    console.log('🔍 Background: Forwarding settings to all tabs:', { isEnabled, urlPattern, reportingUrl });
     chrome.tabs.query({}, (tabs) => {
       console.log('🔍 Background: Found', tabs.length, 'tabs to update');
       tabs.forEach(tab => {
@@ -33,7 +63,8 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         chrome.tabs.sendMessage(tab.id, {
           action: 'settingsChanged',
           enabled: isEnabled,
-          urlPattern: urlPattern
+          urlPattern: urlPattern,
+          reportingUrl: reportingUrl
         }).then(() => {
           console.log('🔍 Background: Message sent successfully to tab', tab.id);
         }).catch((error) => {
@@ -61,6 +92,9 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       
       // Still log to console for debugging
       console.log('🔍 Request Sniffer - Captured Request/Response:', requestData);
+      
+      // Send to reporting URL if configured
+      reportCapturedRequest(requestData);
     }
   } else if (request.action === 'getRequests') {
     // Send requests to popup
@@ -71,8 +105,8 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     sendResponse({ success: true });
   } else if (request.action === 'getSettings') {
     // Send current settings to content script
-    console.log('🔍 Background: Sending settings via polling:', { isEnabled, urlPattern });
-    sendResponse({ enabled: isEnabled, urlPattern: urlPattern });
+    console.log('🔍 Background: Sending settings via polling:', { isEnabled, urlPattern, reportingUrl });
+    sendResponse({ enabled: isEnabled, urlPattern: urlPattern, reportingUrl: reportingUrl });
   }
   
   return willRespond;

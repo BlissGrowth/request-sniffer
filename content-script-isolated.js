@@ -5,14 +5,16 @@
 
   let currentSettings = {
     enabled: false,
-    urlPattern: '.*'
+    urlPattern: '.*',
+    reportingUrl: ''
   };
 
   // Load initial settings
   function loadSettings() {
-    chrome.storage.sync.get(['enabled', 'urlPattern'], function(result) {
+    chrome.storage.sync.get(['enabled', 'urlPattern', 'reportingUrl'], function(result) {
       currentSettings.enabled = result.enabled || false;
       currentSettings.urlPattern = result.urlPattern || '.*';
+      currentSettings.reportingUrl = result.reportingUrl || '';
       console.log('🔍 ISOLATED: Initial settings loaded:', currentSettings);
       
       // Send settings to MAIN world
@@ -35,6 +37,7 @@
     if (message.action === 'settingsChanged') {
       currentSettings.enabled = message.enabled;
       currentSettings.urlPattern = message.urlPattern || '.*';
+      currentSettings.reportingUrl = message.reportingUrl || '';
       console.log('🔍 ISOLATED: Settings updated:', currentSettings);
       
       // Forward to MAIN world
@@ -45,9 +48,10 @@
   // Listen for storage changes as backup
   chrome.storage.onChanged.addListener((changes) => {
     console.log('🔍 ISOLATED: Storage changed:', changes);
-    if (changes.enabled || changes.urlPattern) {
+    if (changes.enabled || changes.urlPattern || changes.reportingUrl) {
       currentSettings.enabled = changes.enabled?.newValue ?? currentSettings.enabled;
       currentSettings.urlPattern = changes.urlPattern?.newValue ?? currentSettings.urlPattern;
+      currentSettings.reportingUrl = changes.reportingUrl?.newValue ?? currentSettings.reportingUrl;
       console.log('🔍 ISOLATED: Settings updated from storage:', currentSettings);
       
       // Forward to MAIN world
