@@ -62,18 +62,12 @@
   }
 
   function logRequestResponse(data) {
-    // In MAIN world, chrome APIs might not be available
-    if (typeof chrome !== 'undefined' && chrome.runtime) {
-      chrome.runtime.sendMessage({
-        action: 'logRequest',
-        data: data
-      }).catch(() => {
-        // Silently handle errors if background script isn't ready
-      });
-    } else {
-      // Fallback: log directly to console if can't send to background
-      console.log('🔍 Request Sniffer - Captured Request/Response:', data);
-    }
+    // Send to ISOLATED world for forwarding to background
+    console.log('🔍 MAIN: Sending request to ISOLATED world:', data.url);
+    window.postMessage({
+      type: 'REQUEST_SNIFFER_LOG',
+      requestData: data
+    }, '*');
   }
 
   // Override fetch API
@@ -283,25 +277,43 @@
     return originalXHRSend.apply(this, arguments);
   };
 
-  // Listen for settings changes (if chrome APIs available)
-  if (typeof chrome !== 'undefined' && chrome.storage) {
-    chrome.storage.onChanged.addListener((changes) => {
-      if (changes.enabled || changes.urlPattern) {
-        updateSettings();
+  // Listen for settings from ISOLATED world via window messaging
+  window.addEventListener('message', (event) => {
+    if (event.source !== window) return;
+    
+    if (event.data.type === 'REQUEST_SNIFFER_SETTINGS') {
+      console.log('🔍 MAIN: Received settings from ISOLATED world:', event.data.settings);
+      const settings = event.data.settings;
+      isEnabled = settings.enabled;
+      urlPattern = settings.urlPattern || '.*';
+      try {
+        compiledRegex = new RegExp(urlPattern);
+        console.log('🔍 MAIN: Settings updated -', {
+          isEnabled,
+          urlPattern,
+          regexTest: compiledRegex.test('https://api.example.com')
+        });
+      } catch (e) {
+        console.warn('🔍 MAIN: Invalid regex, using default:', e);
+        compiledRegex = new RegExp('.*');
       }
-    });
-  }
+      settingsLoaded = true;
+    }
+  });
 
   // Initial settings load
-  console.log('🔍 Request Sniffer: Content script loaded on:', window.location.href);
+  console.log('🔍 MAIN: Content script loaded on:', window.location.href);
+  
+  // Try legacy settings load as fallback
   updateSettings();
   
   // Also try to set default enabled state for debugging
   setTimeout(() => {
     if (!settingsLoaded) {
-      console.warn('🔍 Request Sniffer: Settings not loaded after 1s, using defaults');
+      console.warn('🔍 MAIN: Settings not loaded after 2s, using defaults');
       isEnabled = true; // Enable by default for debugging
       compiledRegex = new RegExp('.*'); // Match everything
+      settingsLoaded = true;
     }
-  }, 1000);
+  }, 2000);
 })();

@@ -25,6 +25,51 @@
       <p>Enter a regex pattern to match URLs. When enabled, matching requests will be logged to the console.</p>
     </div>
   </div>
+
+  <!-- Request List Section -->
+  <div class="requests-section">
+    <div class="requests-header">
+      <h3>Captured Requests</h3>
+      <button id="clearRequests" class="clear-btn">Clear All</button>
+    </div>
+    
+    <div class="requests-list" id="requestsList">
+      <div class="no-requests">No requests captured yet</div>
+    </div>
+  </div>
+
+  <!-- Request Detail Modal -->
+  <div id="requestModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modalTitle">Request Details</h3>
+        <span class="close-btn" id="closeModal">&times;</span>
+      </div>
+      <div class="modal-body">
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="request-headers">Request Headers</button>
+          <button class="tab-btn" data-tab="request-body">Request Body</button>
+          <button class="tab-btn" data-tab="response-headers">Response Headers</button>
+          <button class="tab-btn" data-tab="response-body">Response Body</button>
+        </div>
+        
+        <div class="tab-content">
+          <div id="request-headers" class="tab-pane active">
+            <pre id="requestHeadersContent"></pre>
+          </div>
+          <div id="request-body" class="tab-pane">
+            <pre id="requestBodyContent"></pre>
+          </div>
+          <div id="response-headers" class="tab-pane">
+            <pre id="responseHeadersContent"></pre>
+          </div>
+          <div id="response-body" class="tab-pane">
+            <pre id="responseBodyContent"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
   
   <script src="popup.js"></script>
 </body>

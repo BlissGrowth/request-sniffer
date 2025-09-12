@@ -5,7 +5,8 @@
   "description": "Monitor and log network requests matching URL patterns",
   "permissions": [
     "storage",
-    "activeTab"
+    "activeTab",
+    "tabs"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -18,6 +19,13 @@
     "default_title": "Request Sniffer"
   },
   "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content-script-isolated.js"],
+      "run_at": "document_start",
+      "all_frames": true,
+      "world": "ISOLATED"
+    },
     {
       "matches": ["<all_urls>"],
       "js": ["content-script.js"],
